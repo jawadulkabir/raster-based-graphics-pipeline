@@ -85,9 +85,6 @@ public:
         vector c1 = Rodrigues(axis,vector(1.0,0,0),theta);
         vector c2 = Rodrigues(axis,vector(0,1.0,0),theta);
         vector c3 = Rodrigues(axis,vector(0,0,1.0),theta);
-        c1.print();
-        c2.print(); 
-        c3.print();
 
         double** matrix = getIdentityMatrix();
         matrix[0][0] = c1.x;
@@ -109,7 +106,6 @@ public:
         double d = dotProduct(a,X);
         double c = cos(theta);
         double s = sin(theta);
-        stage1<<"Rod "<<theta<<" "<<c<<" "<<s<<endl;
         double t = 1-c;
         return vector(
             c*X.x+s*Y.x+t*d*a.x,
@@ -133,8 +129,6 @@ public:
         string command;
         double** matrix = getIdentityMatrix();
         S.push(matrix);
-
-            int trcount=0;
         
         while(true)
         {
@@ -142,7 +136,6 @@ public:
             if(command=="end") break;
             else if(command=="triangle")
             {
-                trcount++;
                 struct vector p1,p2,p3;
                 cin>>p1.x>>p1.y>>p1.z>>p2.x>>p2.y>>p2.z>>p3.x>>p3.y>>p3.z;
 
@@ -164,13 +157,6 @@ public:
 
                 
                 double** temp = S.top();
-                if(trcount==9) {
-                    stage1<<"faulty triangle`````````````````````````\n";
-                    stage1<<S.size()<<"\n";
-                    printTriangle(temp);
-                    printTriangle(triangleMatrix);
-                    stage1<<"faulty triangle`````````````````````````\n";
-                }
                 double** transformedTriangle = multiplyMatrix(temp,triangleMatrix);
                 printTriangle(transformedTriangle);
             }
@@ -197,13 +183,6 @@ public:
                 double** newMatrix = multiplyMatrix(top,matrix);
                 S.pop();
                 S.push(newMatrix);
-                if(angle==60)
-                {
-                    stage1<<"IN ROTATE`````````````````````````\n";
-                    printTriangle(matrix);
-                    printTriangle(newMatrix);
-                    stage1<<"IN ROTATE`````````````````````````\n";
-                }
             }
             else if(command=="scale")
             {
