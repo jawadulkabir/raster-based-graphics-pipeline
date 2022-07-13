@@ -1,8 +1,8 @@
 #include<bits/stdc++.h>
  using namespace std;
 
-
-ofstream stage1;
+ifstream stage1in, stage2in, stage3in;
+ofstream stage1out, stage2out, stage3out;
 
 class Pipeline
 {
@@ -32,16 +32,18 @@ class Pipeline
         }
         void print()
         {
-            stage1<<"vec "<<x<<" "<<y<<" "<<z<<endl;
+            cout<<"vec "<<x<<" "<<y<<" "<<z<<endl;
         }
     };
     stack<double**>S;
+    int triangleCount = 0;
 
 public:
     void initialize()
     {
-        cin>>eye_x>>eye_y>>eye_z>>look_x>>look_y>>look_z>>up_x>>up_y>>up_z>>fovY>>aspectRatio>>near>>far;
+        stage1in>>eye_x>>eye_y>>eye_z>>look_x>>look_y>>look_z>>up_x>>up_y>>up_z>>fovY>>aspectRatio>>near>>far;
         modelingTransform();
+        viewTransform();
     }
 
     double** getIdentityMatrix()
@@ -124,6 +126,27 @@ public:
         return a.x*b.x+a.y*b.y+a.z*b.z;
     }
 
+    double** getTriangleMatrix(vector p1, vector p2, vector p3)
+    {
+        double** triangleMatrix = getIdentityMatrix();
+        triangleMatrix[0][0] = p1.x;
+        triangleMatrix[1][0] = p1.y;
+        triangleMatrix[2][0] = p1.z;
+        triangleMatrix[3][0] = 1;
+        
+        triangleMatrix[0][1] = p2.x;
+        triangleMatrix[1][1] = p2.y;
+        triangleMatrix[2][1] = p2.z;
+        triangleMatrix[3][1] = 1;
+        
+        triangleMatrix[0][2] = p3.x;
+        triangleMatrix[1][2] = p3.y;
+        triangleMatrix[2][2] = p3.z;
+        triangleMatrix[3][2] = 1;
+
+        return triangleMatrix;
+    }
+
     void modelingTransform()
     {
         string command;
@@ -132,38 +155,25 @@ public:
         
         while(true)
         {
-            cin>>command;
+            stage1in>>command;
             if(command=="end") break;
             else if(command=="triangle")
             {
                 struct vector p1,p2,p3;
-                cin>>p1.x>>p1.y>>p1.z>>p2.x>>p2.y>>p2.z>>p3.x>>p3.y>>p3.z;
+                stage1in>>p1.x>>p1.y>>p1.z>>p2.x>>p2.y>>p2.z>>p3.x>>p3.y>>p3.z;
 
-                double** triangleMatrix = getIdentityMatrix();
-                triangleMatrix[0][0] = p1.x;
-                triangleMatrix[1][0] = p1.y;
-                triangleMatrix[2][0] = p1.z;
-                triangleMatrix[3][0] = 1;
-                
-                triangleMatrix[0][1] = p2.x;
-                triangleMatrix[1][1] = p2.y;
-                triangleMatrix[2][1] = p2.z;
-                triangleMatrix[3][1] = 1;
-                
-                triangleMatrix[0][2] = p3.x;
-                triangleMatrix[1][2] = p3.y;
-                triangleMatrix[2][2] = p3.z;
-                triangleMatrix[3][2] = 1;
+                double** triangleMatrix = getTriangleMatrix(p1,p2,p3);
 
                 
                 double** temp = S.top();
                 double** transformedTriangle = multiplyMatrix(temp,triangleMatrix);
-                printTriangle(transformedTriangle);
+                printTriangle(transformedTriangle,stage1out);
+                triangleCount++;
             }
             else if(command=="translate")
             {
                 struct vector t;
-                cin>>t.x>>t.y>>t.z;
+                stage1in>>t.x>>t.y>>t.z;
 
                 double** matrix = getTranslationMatrix(t.x,t.y,t.z);
                 double** top = S.top();
@@ -175,7 +185,7 @@ public:
             {
                 struct vector r;
                 double angle;
-                cin>>angle>>r.x>>r.y>>r.z;
+                stage1in>>angle>>r.x>>r.y>>r.z;
                 double radian = angle*3.141592653589793/180;
 
                 double** matrix = getRotationMatrix(radian,r.x,r.y,r.z);
@@ -187,7 +197,7 @@ public:
             else if(command=="scale")
             {
                 struct vector s;
-                cin>>s.x>>s.y>>s.z;
+                stage1in>>s.x>>s.y>>s.z;
 
                 double** matrix = getScalingMatrix(s.x,s.y,s.z);
                 double** top = S.top();
@@ -207,7 +217,53 @@ public:
             
         }
     }
-    
+
+    void viewTransform()
+    {
+
+        vector eye(eye_x,eye_y,eye_z);
+        vector look(look_x,look_y,look_z);
+        vector up(up_x,up_y,up_z); 
+
+        vector l(look.x-eye.x,look.y-eye.y,look.z-eye.z);
+        l = l.normalize();
+        vector r = crossProduct(l,up);
+        r = r.normalize();
+        vector u = crossProduct(r,l);
+
+        double** viewTranslationMatrix = getIdentityMatrix();
+        viewTranslationMatrix[0][3] = -eye.x;
+        viewTranslationMatrix[1][3] = -eye.y;
+        viewTranslationMatrix[2][3] = -eye.z;
+
+
+        double** viewRotationMatrix = getIdentityMatrix();
+        viewRotationMatrix[0][0] = r.x;
+        viewRotationMatrix[0][1] = r.y;
+        viewRotationMatrix[0][2] = r.z;
+
+        viewRotationMatrix[1][0] = u.x;
+        viewRotationMatrix[1][1] = u.y;
+        viewRotationMatrix[1][2] = u.z;
+
+        viewRotationMatrix[2][0] = -l.x;
+        viewRotationMatrix[2][1] = -l.y;
+        viewRotationMatrix[2][2] = -l.z;
+
+
+        double** viewMatrix = multiplyMatrix(viewTranslationMatrix,viewRotationMatrix);
+        
+        vector p1,p2,p3;
+        for(int i=0;i<triangleCount;i++)
+        {
+            stage2in>>p1.x>>p1.y>>p1.z>>p2.x>>p2.y>>p2.z>>p3.x>>p3.y>>p3.z;
+            double** triangleMatrix = getTriangleMatrix(p1,p2,p3);
+            double** transformedTriangle = multiplyMatrix(viewMatrix,triangleMatrix);
+            printTriangle(transformedTriangle,stage2out);
+        }
+
+    }    
+
     double** multiplyMatrix(double** arr1,double** arr2)
     {
         double** matrix = new double*[4];
@@ -226,24 +282,30 @@ public:
         return matrix;
     }
 
-    void printTriangle(double** matrix)
+    void printTriangle(double** matrix, ofstream& stage)
     {
         for(int j=0;j<3;j++)
         {
             double x = matrix[0][j];
             double y = matrix[1][j];
             double z = matrix[2][j];
-            stage1<<fixed<<std::setprecision(7)<<x<<" "<<y<<" "<<z<<endl;
+            stage<<fixed<<std::setprecision(7)<<x<<" "<<y<<" "<<z<<endl;
         }
-        stage1<<endl;
+        stage<<endl;
     }
 };
 
 int main()
 {
-    freopen("scene.txt","r",stdin);
-    stage1.open("stage1.txt");
-
+    
+    stage1in.open("scene.txt"); 
+    stage2in.open("stage1.txt"); 
+    stage3in.open("stage2.txt"); 
+    
+    stage1out.open("stage1.txt");
+    stage2out.open("stage2.txt");
+    stage3out.open("stage2.txt");
+    
     Pipeline p;
     p.initialize();
 
