@@ -4,8 +4,8 @@ import numpy as np
 
 
 v = [5, 0, 0]
-axis = [1,1,0]
-angle = 60
+axis = [0,0,1]
+angle = 90
 
 theta = angle*3.14159/180
 

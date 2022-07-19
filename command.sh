@@ -1,3 +1,3 @@
-g++ 34o.cpp
+g++ pipeline.cpp
 ./a.out
 echo "done"
