@@ -1,8 +1,12 @@
 #include<bits/stdc++.h>
+#include <time.h>       /* time */
+
+#include "bitmap_image.hpp"
+
  using namespace std;
 
-ifstream stage1in, stage2in, stage3in;
-ofstream stage1out, stage2out, stage3out;
+ifstream stage1in, stage2in, stage3in, stage4in, configin;
+ofstream stage1out, stage2out, stage3out, z_buffer_out;
 
 class Pipeline
 {
@@ -10,6 +14,15 @@ class Pipeline
     double look_x,look_y,look_z;
     double up_x,up_y,up_z;
     double fovY,aspectRatio,near,far;
+
+    double** z_buffer;
+
+    int screen_height, screen_width;
+    double x_left_limit, x_right_limit, y_bottom_limit, y_top_limit,z_front_limit,z_rear_limit; //pixel side coordinates
+
+    double top_Y, left_X, right_X, bottom_Y; //pixel midpoint coordinates
+    double dx,dy,z_max;
+
     struct vector
     {
         double x,y,z;
@@ -34,7 +47,74 @@ class Pipeline
         {
             cout<<"vec "<<x<<" "<<y<<" "<<z<<endl;
         }
+
     };
+
+
+
+    //Triangle struct is only used for stage 4 as instructed in spec
+    struct Triangle
+    {
+        vector points[3];
+        int color[3];
+        double max_y;
+        double min_y;
+        
+        void generateColor()
+        {
+            for(int i=0;i<3;i++)
+            {
+                rand();
+                color[i]=rand()%255;
+            }
+        }
+        
+
+        Triangle()
+        {
+            points[0]=vector(0,0,0);
+            points[1]=vector(0,0,0);
+            points[2]=vector(0,0,0);
+            max_y = 0;
+            generateColor();;
+        }
+
+        Triangle(vector p1,vector p2,vector p3)
+        {
+            points[0]=p1;
+            points[1]=p2;
+            points[2]=p3;
+            sort(points, points+3, point_compare);
+            generateColor();
+        }
+
+        void compute_max_y(double topY)
+        {
+            max_y = max(max(points[0].y,points[1].y),points[2].y);
+            max_y = min(max_y,topY);
+        }
+
+        void compute_min_y(double bottomY)
+        {
+            min_y = min(min(points[0].y,points[1].y),points[2].y);
+            min_y = max(min_y,bottomY);
+        }
+
+        bool static point_compare(vector a, vector b)
+        {
+            return a.y<b.y;
+        }
+
+        void print()
+        {
+            cout<<"tri\n";
+            points[0].print();
+            points[1].print();
+            points[2].print();
+            cout<<"col "<<color[0]<<" "<<color[1]<<" "<<color[2]<<endl<<endl;
+        }
+    };
+    
     stack<double**>S;
     int triangleCount = 0;
 
@@ -45,6 +125,176 @@ public:
         modelingTransform();
         viewTransform();
         projectionTransform();
+        clipping_and_scan_conversion();
+
+    }
+
+    void clipping_and_scan_conversion()
+    {
+        configin>>screen_height>>screen_width>>x_left_limit>>y_bottom_limit>>z_front_limit>>z_rear_limit;
+        x_right_limit = -x_left_limit;
+        y_top_limit = -y_bottom_limit;
+
+        dx = (x_right_limit-x_left_limit)/screen_width;
+        dy = (y_top_limit-y_bottom_limit)/screen_height;
+
+        top_Y = y_top_limit-dy/2.0; //representative line of the topmost pixel
+        left_X = x_left_limit+dx/2.0; //representative line of the leftmost pixel
+        right_X = x_right_limit-dx/2.0; //representative line of the rightmost pixel
+        bottom_Y = y_bottom_limit+dy/2.0; //representative line of the bottommost pixel
+        
+
+        z_max = z_rear_limit;
+        Triangle triangle[triangleCount];
+        for(int i=0;i<triangleCount;i++)
+        {
+            stage4in>>triangle[i].points[0].x>>triangle[i].points[0].y>>triangle[i].points[0].z;
+            stage4in>>triangle[i].points[1].x>>triangle[i].points[1].y>>triangle[i].points[1].z;
+            stage4in>>triangle[i].points[2].x>>triangle[i].points[2].y>>triangle[i].points[2].z;
+            // z_max = max(z_max,max(max(triangle[i].points[0].z,triangle[i].points[1].z),triangle[i].points[2].z));
+        }
+
+
+        //z buffer matrix initialization
+        z_buffer = new double*[screen_height];
+        for(int i=0;i<screen_height;i++)
+        {
+            z_buffer[i] = new double[screen_width];
+            for(int j=0;j<screen_width;j++)
+            {
+                z_buffer[i][j] = z_max;
+            }
+        }
+
+        //bitmap image initialization
+        bitmap_image image(screen_width,screen_height);
+
+        // for(int i=0;i<screen_height;i++){
+        //     for(int j=0;j<screen_width;j++){
+        //         image.set_pixel(i,j,0,0,0);
+        //     }
+        // }
+        // image.save_image("bal.bmp");
+        // cout<<"outed\n";
+
+        bitmap_image test(screen_width,screen_height);
+
+        // int arr[3] = {0,1,10};
+        for(int k=0;k<triangleCount;k++)
+        {   
+            // int k=arr[a];
+            for(int i=k*screen_height/triangleCount;i<(k+1)*screen_height/triangleCount;i++)
+            {
+                for(int j=0;j<screen_width;j++)
+                {
+                    test.set_pixel(j,i,triangle[k].color[0],triangle[k].color[1],triangle[k].color[2]);
+                }
+            }
+
+            cout<<"k = "<<k<<endl;
+            triangle[k].print();
+
+            triangle[k].compute_max_y(top_Y);
+            triangle[k].compute_min_y(bottom_Y);
+
+            int row_start = round((top_Y - triangle[k].max_y)/dy);
+            int row_end = round((top_Y - triangle[k].min_y)/dy);
+            cout<<"rst: "<<row_start<<" rend: "<<row_end<<endl;
+
+            double y1, y2, y3; //y1 and y2 must be unequal //y1 and y3 must be unequal
+            double x1, x2, x3;
+            double z2, z1, z3;
+            if(triangle[k].points[0].y == triangle[k].points[1].y)
+            {
+                y1 = triangle[k].points[2].y; x1 = triangle[k].points[2].x; z1 = triangle[k].points[2].z; 
+                y2 = triangle[k].points[0].y; x2 = triangle[k].points[0].x; z2 = triangle[k].points[0].z;  
+                y3 = triangle[k].points[1].y; x3 = triangle[k].points[1].x; z3 = triangle[k].points[1].z; 
+            }
+            else if(triangle[k].points[1].y == triangle[k].points[2].y)
+            {
+                y1 = triangle[k].points[0].y; x1 = triangle[k].points[0].x; z1 = triangle[k].points[0].z; 
+                y2 = triangle[k].points[1].y; x2 = triangle[k].points[1].x; z2 = triangle[k].points[1].z; 
+                y3 = triangle[k].points[2].y; x3 = triangle[k].points[2].x; z3 = triangle[k].points[2].z; 
+            }
+            else
+            {
+                y1 = triangle[k].points[1].y; x1 = triangle[k].points[1].x; z1 = triangle[k].points[1].z; 
+                y2 = triangle[k].points[2].y; x2 = triangle[k].points[2].x; z2 = triangle[k].points[2].z; 
+                y3 = triangle[k].points[0].y; x3 = triangle[k].points[0].x; z3 = triangle[k].points[0].z; 
+            }
+
+            cout<<"y1: "<<y1<<" y2: "<<y2<<" y3: "<<y3<<endl<<endl<<endl<<endl;
+
+
+            for(int i=row_start;i<=row_end;i++)
+            {
+                double ys = top_Y - i*dy;
+                double left_intersecting_line = (x2-x1)*(ys-y1)/(y2-y1) + x1;
+                double right_intersecting_line = (x3-x1)*(ys-y1)/(y3-y1) + x1;
+                // cout<<"left: "<<left_intersecting_line<<" right: "<<right_intersecting_line<<endl;
+
+                if(left_intersecting_line>right_intersecting_line)
+                {
+                    swap(left_intersecting_line,right_intersecting_line);
+                }
+
+                //min_y and max_y are triangle specific, but min_x and max_x are scanline specific
+                double min_x = max(left_intersecting_line,left_X);  //mix_x is xa
+                double max_x = min(right_intersecting_line,right_X); //max_x is xb
+                double xa = min_x;
+                double xb = max_x;
+                double za = z1 + (ys-y1)*(z2-z1)/(y2-y1);
+                double zb = z1 + (ys-y1)*(z3-z1) /(y3-y1);
+                // cout<<"zb: "<<zb<<endl;
+                // cout<<"za: "<<za<<endl;
+
+                int left_column = round((min_x - left_X)/dx);
+                int right_column = round((max_x - left_X)/dx);
+
+                // cout<<"left_column: "<<left_column<<" right_column: "<<right_column<<endl;
+
+                double row_const = (zb-za)/(xb-xa);
+                // cout<<"row_const: "<<row_const<<endl;
+
+                for(int j=left_column;j<=right_column;j++)
+                {
+                    double zp;
+                    double xp = left_X + j*dx;
+
+                    if(j==left_column) zp = za + (xp-xa)*row_const;
+                    else zp = zp + dx*row_const;
+
+                    // cout<<zp<<endl;
+
+                    if(zp<z_buffer[i][j] && zp>=z_front_limit)
+                    {
+                        z_buffer[i][j] = zp;
+                        double r = triangle[k].color[0];
+                        double g = triangle[k].color[1];
+                        double b = triangle[k].color[2];
+                        image.set_pixel(j,i,r,g,b);
+                        // cout<<"settt\n";
+                    }
+                }   
+            }
+        }
+
+        image.save_image("out.bmp");
+        test.save_image("test.bmp");
+        cout<<"outed\n";
+
+        for(int i =0;i<screen_height;i++)
+        {
+            for(int j=0;j<screen_width;j++)
+            {
+                if(z_buffer[i][j]<z_max)
+                    z_buffer_out<<z_buffer[i][j]<<" ";
+            }
+                
+            z_buffer_out<<endl;
+        }
+            
+
     }
 
     double** getIdentityMatrix()
@@ -335,6 +585,15 @@ public:
         }
         stage<<endl;
     }
+    ~Pipeline()
+    {
+        cout<<"destructor\n";
+        for(int i=0;i<screen_height;i++)
+        {
+            delete[] z_buffer[i];
+        }
+        delete[] z_buffer;
+    }
 };
 
 int main()
@@ -343,12 +602,16 @@ int main()
     stage1in.open("scene.txt"); 
     stage2in.open("stage1.txt"); 
     stage3in.open("stage2.txt"); 
+    stage4in.open("stage3.txt");
+    configin.open("config.txt");
     
     stage1out.open("stage1.txt");
     stage2out.open("stage2.txt");
     stage3out.open("stage3.txt");
+    z_buffer_out.open("z_buffer.txt");
     
     Pipeline p;
     p.initialize();
+
 
 }
