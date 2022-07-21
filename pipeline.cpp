@@ -115,7 +115,7 @@ class Pipeline
             points[0].print();
             points[1].print();
             points[2].print();
-            cout<<"col "<<color[0]<<" "<<color[1]<<" "<<color[2]<<endl<<endl;
+            cout<<"color "<<color[0]<<" "<<color[1]<<" "<<color[2]<<endl<<endl;
         }
     };
     
@@ -183,71 +183,27 @@ public:
         //bitmap image initialization
         bitmap_image image(screen_width,screen_height);
 
-        bitmap_image test(screen_width,screen_height);
-
-        // int arr[3] = {0,1,10};
         for(int k=0;k<triangleCount;k++)
         {   
-            // int k=arr[a];
-            for(int i=k*screen_height/triangleCount;i<(k+1)*screen_height/triangleCount;i++)
-            {
-                for(int j=0;j<screen_width;j++)
-                {
-                    test.set_pixel(j,i,triangle[k].color[0],triangle[k].color[1],triangle[k].color[2]);
-                }
-            }
-
-            cout<<"k = "<<k<<endl;
-            triangle[k].print();
-
             triangle[k].compute_max_y(top_Y);
             triangle[k].compute_min_y(bottom_Y);
 
             int row_start = round((top_Y - triangle[k].max_y)/dy);
             int row_end = round((top_Y - triangle[k].min_y)/dy);
-            cout<<"rst: "<<row_start<<" rend: "<<row_end<<endl;
-
-            // double y1, y2, y3; //y1 and y2 must be unequal //y1 and y3 must be unequal
-            // double x1, x2, x3;
-            // double z2, z1, z3;
-            // if(triangle[k].points[0].y == triangle[k].points[1].y)
-            // {
-            //     y1 = triangle[k].points[2].y; x1 = triangle[k].points[2].x; z1 = triangle[k].points[2].z; 
-            //     y2 = triangle[k].points[0].y; x2 = triangle[k].points[0].x; z2 = triangle[k].points[0].z;  
-            //     y3 = triangle[k].points[1].y; x3 = triangle[k].points[1].x; z3 = triangle[k].points[1].z; 
-            // }
-            // else if(triangle[k].points[1].y == triangle[k].points[2].y)
-            // {
-            //     y1 = triangle[k].points[0].y; x1 = triangle[k].points[0].x; z1 = triangle[k].points[0].z; 
-            //     y2 = triangle[k].points[1].y; x2 = triangle[k].points[1].x; z2 = triangle[k].points[1].z; 
-            //     y3 = triangle[k].points[2].y; x3 = triangle[k].points[2].x; z3 = triangle[k].points[2].z; 
-            // }
-            // else
-            // {
-            //     y1 = triangle[k].points[1].y; x1 = triangle[k].points[1].x; z1 = triangle[k].points[1].z; 
-            //     y2 = triangle[k].points[2].y; x2 = triangle[k].points[2].x; z2 = triangle[k].points[2].z; 
-            //     y3 = triangle[k].points[0].y; x3 = triangle[k].points[0].x; z3 = triangle[k].points[0].z; 
-            // }
-
-            // cout<<"y1: "<<y1<<" y2: "<<y2<<" y3: "<<y3<<endl<<endl<<endl<<endl;
-
 
             for(int i=row_start;i<=row_end;i++)
             {
                 double ys = top_Y - i*dy;
-                // double left_intersecting_line = (x2-x1)*(ys-y1)/(y2-y1) + x1;
-                // double right_intersecting_line = (x3-x1)*(ys-y1)/(y3-y1) + x1;
-                // cout<<"left: "<<left_intersecting_line<<" right: "<<right_intersecting_line<<endl;
 
-
-                /****new stuff*/
-                double y1, y2, y3; //y1 and y2 must be unequal //y1 and y3 must be unequal
+                double y1, y2, y3; 
                 double x1, x2, x3;
                 double z2, z1, z3;
                 y1 = triangle[k].points[0].y; x1 = triangle[k].points[0].x; z1 = triangle[k].points[0].z; 
                 y2 = triangle[k].points[1].y; x2 = triangle[k].points[1].x; z2 = triangle[k].points[1].z; 
                 y3 = triangle[k].points[2].y; x3 = triangle[k].points[2].x; z3 = triangle[k].points[2].z; 
 
+
+                //calculate xa, xb, za, zb (intersecion points of the scanline)
                 double left_intersecting_line, right_intersecting_line, za, zb;;
                 if(ys > triangle[k].points[1].y || triangle[k].points[0].y == triangle[k].points[1].y)
                 {
@@ -263,7 +219,6 @@ public:
                     za = get_intersecting_z(y2,z2,y3,z3,ys);
                     zb = get_intersecting_z(y1,z1,y3,z3,ys);
                 }     
-                /****/
 
                 if(left_intersecting_line>right_intersecting_line)
                 {
@@ -272,22 +227,15 @@ public:
                 }
 
                 //min_y and max_y are triangle specific, but min_x and max_x are scanline specific
-                double min_x = max(left_intersecting_line,left_X);  //mix_x is xa
+                double min_x = max(left_intersecting_line,left_X);  //min_x is xa
                 double max_x = min(right_intersecting_line,right_X); //max_x is xb
                 double xa = min_x;
                 double xb = max_x;
-                // double za = z1 + (ys-y1)*(z2-z1)/(y2-y1);
-                // double zb = z1 + (ys-y1)*(z3-z1) /(y3-y1);
-                // cout<<"zb: "<<zb<<endl;
-                // cout<<"za: "<<za<<endl;
 
                 int left_column = round((min_x - left_X)/dx);
                 int right_column = round((max_x - left_X)/dx);
 
-                // cout<<"left_column: "<<left_column<<" right_column: "<<right_column<<endl;
-
                 double row_const = (zb-za)/(xb-xa);
-                // cout<<"row_const: "<<row_const<<endl;
 
                 for(int j=left_column;j<=right_column;j++)
                 {
@@ -297,7 +245,6 @@ public:
                     if(j==left_column) zp = za + (xp-xa)*row_const;
                     else zp = zp + dx*row_const;
 
-                    // cout<<zp<<endl;
 
                     if(zp<z_buffer[i][j] && zp>=z_front_limit)
                     {
@@ -306,15 +253,12 @@ public:
                         double g = triangle[k].color[1];
                         double b = triangle[k].color[2];
                         image.set_pixel(j,i,r,g,b);
-                        // cout<<"settt\n";
                     }
                 }   
             }
         }
 
         image.save_image("out.bmp");
-        test.save_image("test.bmp");
-        cout<<"outed\n";
 
         for(int i =0;i<screen_height;i++)
         {
@@ -554,12 +498,6 @@ public:
         double t = near*tan(fovY*3.141592653589793/360);
         double r = near*tan(fovX*3.141592653589793/360);
 
-        // double projectionMatrix[4][4] = {
-        //     {near/t,0,0,0},
-        //     {0,near/r,0,0},
-        //     {0,0,-(far+near)/(far-near),-2*far*near/(far-near)},
-        //     {0,0,-1,0}
-        // };
         double** projectionMatrix = getIdentityMatrix();
         projectionMatrix[0][0] = near/r;
         projectionMatrix[1][1] = near/t;
@@ -618,9 +556,9 @@ public:
         }
         stage<<endl;
     }
+
     ~Pipeline()
     {
-        cout<<"destructor\n";
         for(int i=0;i<screen_height;i++)
         {
             delete[] z_buffer[i];
@@ -630,8 +568,7 @@ public:
 };
 
 int main()
-{
-    
+{    
     stage1in.open("scene.txt"); 
     stage2in.open("stage1.txt"); 
     stage3in.open("stage2.txt"); 
@@ -645,6 +582,4 @@ int main()
     
     Pipeline p;
     p.initialize();
-
-
 }
