@@ -84,8 +84,12 @@ class Pipeline
             points[0]=p1;
             points[1]=p2;
             points[2]=p3;
-            sort(points, points+3, point_compare);
             generateColor();
+        }
+
+        void sort()
+        {
+            std::sort(points, points+3, point_compare);
         }
 
         void compute_max_y(double topY)
@@ -102,7 +106,7 @@ class Pipeline
 
         bool static point_compare(vector a, vector b)
         {
-            return a.y<b.y;
+            return a.y>b.y;
         }
 
         void print()
@@ -129,6 +133,16 @@ public:
 
     }
 
+    double get_intersecting_X(double x1, double y1, double x2, double y2, double ys)
+    {
+        return (x1+(x2-x1)*(ys-y1)/(y2-y1));
+    }
+
+    double get_intersecting_z(double y1, double z1, double y2, double z2, double ys)
+    {
+        return (z1+(z2-z1)*(ys-y1)/(y2-y1));
+    }
+
     void clipping_and_scan_conversion()
     {
         configin>>screen_height>>screen_width>>x_left_limit>>y_bottom_limit>>z_front_limit>>z_rear_limit;
@@ -151,7 +165,7 @@ public:
             stage4in>>triangle[i].points[0].x>>triangle[i].points[0].y>>triangle[i].points[0].z;
             stage4in>>triangle[i].points[1].x>>triangle[i].points[1].y>>triangle[i].points[1].z;
             stage4in>>triangle[i].points[2].x>>triangle[i].points[2].y>>triangle[i].points[2].z;
-            // z_max = max(z_max,max(max(triangle[i].points[0].z,triangle[i].points[1].z),triangle[i].points[2].z));
+            triangle[i].sort();
         }
 
 
@@ -168,14 +182,6 @@ public:
 
         //bitmap image initialization
         bitmap_image image(screen_width,screen_height);
-
-        // for(int i=0;i<screen_height;i++){
-        //     for(int j=0;j<screen_width;j++){
-        //         image.set_pixel(i,j,0,0,0);
-        //     }
-        // }
-        // image.save_image("bal.bmp");
-        // cout<<"outed\n";
 
         bitmap_image test(screen_width,screen_height);
 
@@ -201,41 +207,68 @@ public:
             int row_end = round((top_Y - triangle[k].min_y)/dy);
             cout<<"rst: "<<row_start<<" rend: "<<row_end<<endl;
 
-            double y1, y2, y3; //y1 and y2 must be unequal //y1 and y3 must be unequal
-            double x1, x2, x3;
-            double z2, z1, z3;
-            if(triangle[k].points[0].y == triangle[k].points[1].y)
-            {
-                y1 = triangle[k].points[2].y; x1 = triangle[k].points[2].x; z1 = triangle[k].points[2].z; 
-                y2 = triangle[k].points[0].y; x2 = triangle[k].points[0].x; z2 = triangle[k].points[0].z;  
-                y3 = triangle[k].points[1].y; x3 = triangle[k].points[1].x; z3 = triangle[k].points[1].z; 
-            }
-            else if(triangle[k].points[1].y == triangle[k].points[2].y)
-            {
-                y1 = triangle[k].points[0].y; x1 = triangle[k].points[0].x; z1 = triangle[k].points[0].z; 
-                y2 = triangle[k].points[1].y; x2 = triangle[k].points[1].x; z2 = triangle[k].points[1].z; 
-                y3 = triangle[k].points[2].y; x3 = triangle[k].points[2].x; z3 = triangle[k].points[2].z; 
-            }
-            else
-            {
-                y1 = triangle[k].points[1].y; x1 = triangle[k].points[1].x; z1 = triangle[k].points[1].z; 
-                y2 = triangle[k].points[2].y; x2 = triangle[k].points[2].x; z2 = triangle[k].points[2].z; 
-                y3 = triangle[k].points[0].y; x3 = triangle[k].points[0].x; z3 = triangle[k].points[0].z; 
-            }
+            // double y1, y2, y3; //y1 and y2 must be unequal //y1 and y3 must be unequal
+            // double x1, x2, x3;
+            // double z2, z1, z3;
+            // if(triangle[k].points[0].y == triangle[k].points[1].y)
+            // {
+            //     y1 = triangle[k].points[2].y; x1 = triangle[k].points[2].x; z1 = triangle[k].points[2].z; 
+            //     y2 = triangle[k].points[0].y; x2 = triangle[k].points[0].x; z2 = triangle[k].points[0].z;  
+            //     y3 = triangle[k].points[1].y; x3 = triangle[k].points[1].x; z3 = triangle[k].points[1].z; 
+            // }
+            // else if(triangle[k].points[1].y == triangle[k].points[2].y)
+            // {
+            //     y1 = triangle[k].points[0].y; x1 = triangle[k].points[0].x; z1 = triangle[k].points[0].z; 
+            //     y2 = triangle[k].points[1].y; x2 = triangle[k].points[1].x; z2 = triangle[k].points[1].z; 
+            //     y3 = triangle[k].points[2].y; x3 = triangle[k].points[2].x; z3 = triangle[k].points[2].z; 
+            // }
+            // else
+            // {
+            //     y1 = triangle[k].points[1].y; x1 = triangle[k].points[1].x; z1 = triangle[k].points[1].z; 
+            //     y2 = triangle[k].points[2].y; x2 = triangle[k].points[2].x; z2 = triangle[k].points[2].z; 
+            //     y3 = triangle[k].points[0].y; x3 = triangle[k].points[0].x; z3 = triangle[k].points[0].z; 
+            // }
 
-            cout<<"y1: "<<y1<<" y2: "<<y2<<" y3: "<<y3<<endl<<endl<<endl<<endl;
+            // cout<<"y1: "<<y1<<" y2: "<<y2<<" y3: "<<y3<<endl<<endl<<endl<<endl;
 
 
             for(int i=row_start;i<=row_end;i++)
             {
                 double ys = top_Y - i*dy;
-                double left_intersecting_line = (x2-x1)*(ys-y1)/(y2-y1) + x1;
-                double right_intersecting_line = (x3-x1)*(ys-y1)/(y3-y1) + x1;
+                // double left_intersecting_line = (x2-x1)*(ys-y1)/(y2-y1) + x1;
+                // double right_intersecting_line = (x3-x1)*(ys-y1)/(y3-y1) + x1;
                 // cout<<"left: "<<left_intersecting_line<<" right: "<<right_intersecting_line<<endl;
+
+
+                /****new stuff*/
+                double y1, y2, y3; //y1 and y2 must be unequal //y1 and y3 must be unequal
+                double x1, x2, x3;
+                double z2, z1, z3;
+                y1 = triangle[k].points[0].y; x1 = triangle[k].points[0].x; z1 = triangle[k].points[0].z; 
+                y2 = triangle[k].points[1].y; x2 = triangle[k].points[1].x; z2 = triangle[k].points[1].z; 
+                y3 = triangle[k].points[2].y; x3 = triangle[k].points[2].x; z3 = triangle[k].points[2].z; 
+
+                double left_intersecting_line, right_intersecting_line, za, zb;;
+                if(ys > triangle[k].points[1].y || triangle[k].points[0].y == triangle[k].points[1].y)
+                {
+                    left_intersecting_line = get_intersecting_X(x1,y1,x2,y2,ys);
+                    right_intersecting_line = get_intersecting_X(x1,y1,x3,y3,ys);
+                    za = get_intersecting_z(y1,z1,y2,z2,ys);
+                    zb = get_intersecting_z(y1,z1,y3,z3,ys);
+                }           
+                else
+                {
+                    left_intersecting_line = get_intersecting_X(x2,y2,x3,y3,ys);
+                    right_intersecting_line = get_intersecting_X(x1,y1,x3,y3,ys);
+                    za = get_intersecting_z(y2,z2,y3,z3,ys);
+                    zb = get_intersecting_z(y1,z1,y3,z3,ys);
+                }     
+                /****/
 
                 if(left_intersecting_line>right_intersecting_line)
                 {
                     swap(left_intersecting_line,right_intersecting_line);
+                    swap(za,zb);
                 }
 
                 //min_y and max_y are triangle specific, but min_x and max_x are scanline specific
@@ -243,8 +276,8 @@ public:
                 double max_x = min(right_intersecting_line,right_X); //max_x is xb
                 double xa = min_x;
                 double xb = max_x;
-                double za = z1 + (ys-y1)*(z2-z1)/(y2-y1);
-                double zb = z1 + (ys-y1)*(z3-z1) /(y3-y1);
+                // double za = z1 + (ys-y1)*(z2-z1)/(y2-y1);
+                // double zb = z1 + (ys-y1)*(z3-z1) /(y3-y1);
                 // cout<<"zb: "<<zb<<endl;
                 // cout<<"za: "<<za<<endl;
 
